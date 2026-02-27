@@ -1,5 +1,7 @@
 package com.mycontacts;
 
+import com.mycontacts.auth.BasicAuth;
+import com.mycontacts.auth.SessionManager;
 import com.mycontacts.model.User;
 import com.mycontacts.service.UserRegistrationService;
 
@@ -7,6 +9,8 @@ import java.util.Scanner;
 
 public class Main {
     private static UserRegistrationService registrationService = new UserRegistrationService();
+    private static BasicAuth auth = new BasicAuth(registrationService);
+    private static SessionManager session = SessionManager.getInstance();
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -14,21 +18,45 @@ public class Main {
         boolean running = true;
         while (running) {
             System.out.println("\n--- Main Menu ---");
-            System.out.println("1. Register");
+            if (session.isLoggedIn()) {
+                System.out.println("Logged in as: " + session.getCurrentUser().getName());
+                System.out.println("1. Logout");
+            } else {
+                System.out.println("1. Register");
+                System.out.println("2. Login");
+            }
             System.out.println("0. Exit");
             System.out.print("Choose: ");
             String choice = scanner.nextLine();
 
-            switch (choice) {
-                case "1":
-                    registerUser();
-                    break;
-                case "0":
-                    running = false;
-                    System.out.println("Goodbye!");
-                    break;
-                default:
-                    System.out.println("Invalid choice.");
+            if (session.isLoggedIn()) {
+                switch (choice) {
+                    case "1":
+                        auth.logout(session.getCurrentUser().getUserId());
+                        session.clearSession();
+                        break;
+                    case "0":
+                        running = false;
+                        System.out.println("Goodbye!");
+                        break;
+                    default:
+                        System.out.println("Invalid choice.");
+                }
+            } else {
+                switch (choice) {
+                    case "1":
+                        registerUser();
+                        break;
+                    case "2":
+                        loginUser();
+                        break;
+                    case "0":
+                        running = false;
+                        System.out.println("Goodbye!");
+                        break;
+                    default:
+                        System.out.println("Invalid choice.");
+                }
             }
         }
     }
@@ -55,5 +83,18 @@ public class Main {
         } catch (IllegalArgumentException e) {
             System.out.println("✗ Registration failed: " + e.getMessage());
         }
+    }
+
+    private static void loginUser() {
+        System.out.println("\n--- Login ---");
+        System.out.print("Enter email: ");
+        String email = scanner.nextLine();
+
+        System.out.print("Enter password: ");
+        String password = scanner.nextLine();
+
+        auth.login(email, password).ifPresent(user -> {
+            session.setCurrentUser(user);
+        });
     }
 }
