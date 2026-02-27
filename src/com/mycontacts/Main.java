@@ -3,6 +3,10 @@ package com.mycontacts;
 import com.mycontacts.auth.BasicAuth;
 import com.mycontacts.auth.SessionManager;
 import com.mycontacts.model.User;
+import com.mycontacts.pattern.UpdateEmailCommand;
+import com.mycontacts.pattern.UpdateNameCommand;
+import com.mycontacts.pattern.UpdatePasswordCommand;
+import com.mycontacts.service.ProfileService;
 import com.mycontacts.service.UserRegistrationService;
 
 import java.util.Scanner;
@@ -11,6 +15,7 @@ public class Main {
     private static UserRegistrationService registrationService = new UserRegistrationService();
     private static BasicAuth auth = new BasicAuth(registrationService);
     private static SessionManager session = SessionManager.getInstance();
+    private static ProfileService profileService = new ProfileService();
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -21,6 +26,7 @@ public class Main {
             if (session.isLoggedIn()) {
                 System.out.println("Logged in as: " + session.getCurrentUser().getName());
                 System.out.println("1. Logout");
+                System.out.println("2. Manage Profile");
             } else {
                 System.out.println("1. Register");
                 System.out.println("2. Login");
@@ -34,6 +40,9 @@ public class Main {
                     case "1":
                         auth.logout(session.getCurrentUser().getUserId());
                         session.clearSession();
+                        break;
+                    case "2":
+                        manageProfile();
                         break;
                     case "0":
                         running = false;
@@ -96,5 +105,48 @@ public class Main {
         auth.login(email, password).ifPresent(user -> {
             session.setCurrentUser(user);
         });
+    }
+
+    private static void manageProfile() {
+        System.out.println("\n--- Manage Profile ---");
+        User user = session.getCurrentUser();
+        System.out.println("Current Profile: " + user);
+
+        boolean back = false;
+        while (!back) {
+            System.out.println("\n1. Update Name");
+            System.out.println("2. Update Email");
+            System.out.println("3. Update Password");
+            System.out.println("4. Undo Last Change");
+            System.out.println("0. Back");
+            System.out.print("Choose: ");
+            String choice = scanner.nextLine();
+
+            switch (choice) {
+                case "1":
+                    System.out.print("Enter new name: ");
+                    String newName = scanner.nextLine();
+                    profileService.executeCommand(new UpdateNameCommand(user, newName));
+                    break;
+                case "2":
+                    System.out.print("Enter new email: ");
+                    String newEmail = scanner.nextLine();
+                    profileService.executeCommand(new UpdateEmailCommand(user, newEmail));
+                    break;
+                case "3":
+                    System.out.print("Enter new password: ");
+                    String newPassword = scanner.nextLine();
+                    profileService.executeCommand(new UpdatePasswordCommand(user, newPassword));
+                    break;
+                case "4":
+                    profileService.undo();
+                    break;
+                case "0":
+                    back = true;
+                    break;
+                default:
+                    System.out.println("Invalid choice.");
+            }
+        }
     }
 }
