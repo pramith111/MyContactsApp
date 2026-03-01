@@ -4,10 +4,14 @@ import com.mycontacts.auth.BasicAuth;
 import com.mycontacts.auth.SessionManager;
 import com.mycontacts.model.Contact;
 import com.mycontacts.model.User;
+import com.mycontacts.pattern.BasicContactDisplay;
 import com.mycontacts.pattern.ContactBuilder;
+import com.mycontacts.pattern.ContactDisplay;
+import com.mycontacts.pattern.MaskedEmailContactDisplay;
 import com.mycontacts.pattern.UpdateEmailCommand;
 import com.mycontacts.pattern.UpdateNameCommand;
 import com.mycontacts.pattern.UpdatePasswordCommand;
+import com.mycontacts.pattern.UpperCaseContactDisplay;
 import com.mycontacts.service.ContactService;
 import com.mycontacts.service.ProfileService;
 import com.mycontacts.service.UserRegistrationService;
@@ -34,6 +38,7 @@ public class Main {
                 System.out.println("2. Manage Profile");
                 System.out.println("3. Add Contact");
                 System.out.println("4. View All Contacts");
+                System.out.println("5. View Contact Details");
             } else {
                 System.out.println("1. Register");
                 System.out.println("2. Login");
@@ -56,6 +61,9 @@ public class Main {
                         break;
                     case "4":
                         viewAllContacts();
+                        break;
+                    case "5":
+                        viewContactDetails();
                         break;
                     case "0":
                         running = false;
@@ -153,10 +161,8 @@ public class Main {
         System.out.println("\n--- Add Contact ---");
         System.out.print("Contact type (person/organization): ");
         String type = scanner.nextLine();
-
         try {
             ContactBuilder builder = new ContactBuilder().setType(type);
-
             if (type.equalsIgnoreCase("person")) {
                 System.out.print("First name: ");
                 builder.setFirstName(scanner.nextLine());
@@ -175,24 +181,20 @@ public class Main {
                 String website = scanner.nextLine();
                 if (!website.isEmpty()) builder.setWebsite(website);
             }
-
             System.out.print("Phone number (optional, press Enter to skip): ");
             String phone = scanner.nextLine();
             if (!phone.isEmpty()) {
                 System.out.print("Phone type (Mobile/Home/Work): ");
                 builder.setPhoneNumber(phone, scanner.nextLine());
             }
-
             System.out.print("Email (optional, press Enter to skip): ");
             String email = scanner.nextLine();
             if (!email.isEmpty()) {
                 System.out.print("Email type (Personal/Work): ");
                 builder.setEmail(email, scanner.nextLine());
             }
-
             Contact contact = builder.build();
             contactService.addContact(contact);
-
         } catch (IllegalArgumentException | IllegalStateException e) {
             System.out.println("✗ Failed to add contact: " + e.getMessage());
         }
@@ -204,7 +206,50 @@ public class Main {
         if (contacts.isEmpty()) {
             System.out.println("No contacts found.");
         } else {
-            contacts.forEach(c -> System.out.println("\n" + c));
+            for (int i = 0; i < contacts.size(); i++) {
+                System.out.println("[" + i + "] " + contacts.get(i).getDisplayName());
+            }
+        }
+    }
+
+    private static void viewContactDetails() {
+        System.out.println("\n--- View Contact Details ---");
+        List<Contact> contacts = contactService.getAllContacts();
+        if (contacts.isEmpty()) {
+            System.out.println("No contacts found.");
+            return;
+        }
+        viewAllContacts();
+        System.out.print("Enter contact number: ");
+        try {
+            int index = Integer.parseInt(scanner.nextLine());
+            Contact contact = contacts.get(index);
+
+            System.out.println("\nDisplay format:");
+            System.out.println("1. Normal");
+            System.out.println("2. Uppercase");
+            System.out.println("3. Masked Email");
+            System.out.println("4. Uppercase + Masked Email");
+            System.out.print("Choose: ");
+            String format = scanner.nextLine();
+
+            ContactDisplay display;
+            switch (format) {
+                case "2":
+                    display = new UpperCaseContactDisplay(new BasicContactDisplay());
+                    break;
+                case "3":
+                    display = new MaskedEmailContactDisplay(new BasicContactDisplay());
+                    break;
+                case "4":
+                    display = new UpperCaseContactDisplay(new MaskedEmailContactDisplay(new BasicContactDisplay()));
+                    break;
+                default:
+                    display = new BasicContactDisplay();
+            }
+            System.out.println("\n" + display.display(contact));
+        } catch (NumberFormatException | IndexOutOfBoundsException e) {
+            System.out.println("✗ Invalid selection.");
         }
     }
 }
