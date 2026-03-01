@@ -3,16 +3,21 @@ package com.mycontacts;
 import com.mycontacts.auth.BasicAuth;
 import com.mycontacts.auth.SessionManager;
 import com.mycontacts.model.Contact;
+import com.mycontacts.model.Organization;
+import com.mycontacts.model.Person;
 import com.mycontacts.model.User;
 import com.mycontacts.pattern.BasicContactDisplay;
 import com.mycontacts.pattern.ContactBuilder;
 import com.mycontacts.pattern.ContactDisplay;
+import com.mycontacts.pattern.ContactMemento;
+import com.mycontacts.pattern.EditContactCommand;
 import com.mycontacts.pattern.MaskedEmailContactDisplay;
 import com.mycontacts.pattern.UpdateEmailCommand;
 import com.mycontacts.pattern.UpdateNameCommand;
 import com.mycontacts.pattern.UpdatePasswordCommand;
 import com.mycontacts.pattern.UpperCaseContactDisplay;
 import com.mycontacts.service.ContactService;
+import com.mycontacts.service.EditContactService;
 import com.mycontacts.service.ProfileService;
 import com.mycontacts.service.UserRegistrationService;
 
@@ -25,6 +30,7 @@ public class Main {
     private static SessionManager session = SessionManager.getInstance();
     private static ProfileService profileService = new ProfileService();
     private static ContactService contactService = new ContactService();
+    private static EditContactService editContactService = new EditContactService();
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -39,6 +45,7 @@ public class Main {
                 System.out.println("3. Add Contact");
                 System.out.println("4. View All Contacts");
                 System.out.println("5. View Contact Details");
+                System.out.println("6. Edit Contact");
             } else {
                 System.out.println("1. Register");
                 System.out.println("2. Login");
@@ -64,6 +71,9 @@ public class Main {
                         break;
                     case "5":
                         viewContactDetails();
+                        break;
+                    case "6":
+                        editContact();
                         break;
                     case "0":
                         running = false;
@@ -207,7 +217,8 @@ public class Main {
             System.out.println("No contacts found.");
         } else {
             for (int i = 0; i < contacts.size(); i++) {
-                System.out.println("[" + i + "] " + contacts.get(i).getDisplayName());
+                System.out.println("[" + i + "] " + contacts.get(i).getDisplayName()
+                        + " (" + contacts.get(i).getContactType() + ")");
             }
         }
     }
@@ -224,7 +235,6 @@ public class Main {
         try {
             int index = Integer.parseInt(scanner.nextLine());
             Contact contact = contacts.get(index);
-
             System.out.println("\nDisplay format:");
             System.out.println("1. Normal");
             System.out.println("2. Uppercase");
@@ -232,7 +242,6 @@ public class Main {
             System.out.println("4. Uppercase + Masked Email");
             System.out.print("Choose: ");
             String format = scanner.nextLine();
-
             ContactDisplay display;
             switch (format) {
                 case "2":
@@ -242,12 +251,92 @@ public class Main {
                     display = new MaskedEmailContactDisplay(new BasicContactDisplay());
                     break;
                 case "4":
-                    display = new UpperCaseContactDisplay(new MaskedEmailContactDisplay(new BasicContactDisplay()));
+                    display = new UpperCaseContactDisplay(
+                            new MaskedEmailContactDisplay(new BasicContactDisplay()));
                     break;
                 default:
                     display = new BasicContactDisplay();
             }
             System.out.println("\n" + display.display(contact));
+        } catch (NumberFormatException | IndexOutOfBoundsException e) {
+            System.out.println("✗ Invalid selection.");
+        }
+    }
+
+    private static void editContact() {
+        System.out.println("\n--- Edit Contact ---");
+        List<Contact> contacts = contactService.getAllContacts();
+        if (contacts.isEmpty()) {
+            System.out.println("No contacts found.");
+            return;
+        }
+        viewAllContacts();
+        System.out.print("Enter contact number to edit: ");
+        try {
+            int index = Integer.parseInt(scanner.nextLine());
+            Contact contact = contacts.get(index);
+
+            boolean back = false;
+            while (!back) {
+                System.out.println("\n1. Edit Contact Info");
+                System.out.println("2. Undo Last Edit");
+                System.out.println("3. Redo Last Edit");
+                System.out.println("0. Back");
+                System.out.print("Choose: ");
+                String choice = scanner.nextLine();
+
+                switch (choice) {
+                    case "1":
+                        ContactMemento newState = null;
+                        if (contact instanceof Person) {
+                            Person p = (Person) contact;
+                            System.out.print("First name (" + p.getFirstName() + "): ");
+                            String fn = scanner.nextLine();
+                            System.out.print("Last name (" + p.getLastName() + "): ");
+                            String ln = scanner.nextLine();
+                            System.out.print("Address (" + p.getAddress() + "): ");
+                            String addr = scanner.nextLine();
+                            newState = new ContactMemento(
+                                    fn.isEmpty() ? p.getFirstName() : fn,
+                                    ln.isEmpty() ? p.getLastName() : ln,
+                                    null,
+                                    addr.isEmpty() ? p.getAddress() : addr,
+                                    null, null,
+                                    p.getPhoneNumbers(), p.getEmails());
+                        } else if (contact instanceof Organization) {
+                            Organization o = (Organization) contact;
+                            System.out.print("Company name (" + o.getCompanyName() + "): ");
+                            String cn = scanner.nextLine();
+                            System.out.print("Industry (" + o.getIndustry() + "): ");
+                            String ind = scanner.nextLine();
+                            System.out.print("Website (" + o.getWebsite() + "): ");
+                            String web = scanner.nextLine();
+                            newState = new ContactMemento(
+                                    null, null,
+                                    cn.isEmpty() ? o.getCompanyName() : cn,
+                                    null,
+                                    ind.isEmpty() ? o.getIndustry() : ind,
+                                    web.isEmpty() ? o.getWebsite() : web,
+                                    o.getPhoneNumbers(), o.getEmails());
+                        }
+                        if (newState != null) {
+                            editContactService.executeEdit(
+                                    new EditContactCommand(contact, newState));
+                        }
+                        break;
+                    case "2":
+                        editContactService.undo();
+                        break;
+                    case "3":
+                        editContactService.redo();
+                        break;
+                    case "0":
+                        back = true;
+                        break;
+                    default:
+                        System.out.println("Invalid choice.");
+                }
+            }
         } catch (NumberFormatException | IndexOutOfBoundsException e) {
             System.out.println("✗ Invalid selection.");
         }
