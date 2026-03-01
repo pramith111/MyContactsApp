@@ -8,6 +8,7 @@ import com.mycontacts.model.Person;
 import com.mycontacts.model.User;
 import com.mycontacts.pattern.BasicContactDisplay;
 import com.mycontacts.pattern.ContactBuilder;
+import com.mycontacts.pattern.ContactDeletionLogger;
 import com.mycontacts.pattern.ContactDisplay;
 import com.mycontacts.pattern.ContactMemento;
 import com.mycontacts.pattern.EditContactCommand;
@@ -31,9 +32,11 @@ public class Main {
     private static ProfileService profileService = new ProfileService();
     private static ContactService contactService = new ContactService();
     private static EditContactService editContactService = new EditContactService();
+    private static ContactDeletionLogger deletionLogger = new ContactDeletionLogger();
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
+        contactService.addObserver(deletionLogger);
         System.out.println("=== Welcome to MyContacts App ===");
         boolean running = true;
         while (running) {
@@ -46,6 +49,9 @@ public class Main {
                 System.out.println("4. View All Contacts");
                 System.out.println("5. View Contact Details");
                 System.out.println("6. Edit Contact");
+                System.out.println("7. Delete Contact");
+                System.out.println("8. View Deleted Contacts");
+                System.out.println("9. View Deletion Log");
             } else {
                 System.out.println("1. Register");
                 System.out.println("2. Login");
@@ -74,6 +80,15 @@ public class Main {
                         break;
                     case "6":
                         editContact();
+                        break;
+                    case "7":
+                        deleteContact();
+                        break;
+                    case "8":
+                        viewDeletedContacts();
+                        break;
+                    case "9":
+                        deletionLogger.printLog();
                         break;
                     case "0":
                         running = false;
@@ -275,7 +290,6 @@ public class Main {
         try {
             int index = Integer.parseInt(scanner.nextLine());
             Contact contact = contacts.get(index);
-
             boolean back = false;
             while (!back) {
                 System.out.println("\n1. Edit Contact Info");
@@ -284,7 +298,6 @@ public class Main {
                 System.out.println("0. Back");
                 System.out.print("Choose: ");
                 String choice = scanner.nextLine();
-
                 switch (choice) {
                     case "1":
                         ContactMemento newState = null;
@@ -339,6 +352,67 @@ public class Main {
             }
         } catch (NumberFormatException | IndexOutOfBoundsException e) {
             System.out.println("✗ Invalid selection.");
+        }
+    }
+
+    private static void deleteContact() {
+        System.out.println("\n--- Delete Contact ---");
+        List<Contact> contacts = contactService.getAllContacts();
+        if (contacts.isEmpty()) {
+            System.out.println("No contacts found.");
+            return;
+        }
+        viewAllContacts();
+        System.out.print("Enter contact number to delete: ");
+        try {
+            int index = Integer.parseInt(scanner.nextLine());
+            Contact contact = contacts.get(index);
+            System.out.println("\nDelete type:");
+            System.out.println("1. Soft Delete (can be restored)");
+            System.out.println("2. Hard Delete (permanent)");
+            System.out.print("Choose: ");
+            String choice = scanner.nextLine();
+            System.out.print("Are you sure? (yes/no): ");
+            String confirm = scanner.nextLine();
+            if (!confirm.equalsIgnoreCase("yes")) {
+                System.out.println("Deletion cancelled.");
+                return;
+            }
+            if (choice.equals("1")) {
+                contactService.softDelete(contact.getContactId());
+            } else if (choice.equals("2")) {
+                contactService.hardDelete(contact.getContactId());
+            } else {
+                System.out.println("Invalid choice.");
+            }
+        } catch (NumberFormatException | IndexOutOfBoundsException e) {
+            System.out.println("✗ Invalid selection.");
+        }
+    }
+
+    private static void viewDeletedContacts() {
+        System.out.println("\n--- Deleted Contacts ---");
+        List<Contact> deleted = contactService.getDeletedContacts();
+        if (deleted.isEmpty()) {
+            System.out.println("No deleted contacts.");
+            return;
+        }
+        for (int i = 0; i < deleted.size(); i++) {
+            System.out.println("[" + i + "] " + deleted.get(i).getDisplayName()
+                    + " (" + deleted.get(i).getContactType() + ")");
+        }
+        System.out.println("\n1. Restore a contact");
+        System.out.println("0. Back");
+        System.out.print("Choose: ");
+        String choice = scanner.nextLine();
+        if (choice.equals("1")) {
+            System.out.print("Enter contact number to restore: ");
+            try {
+                int index = Integer.parseInt(scanner.nextLine());
+                contactService.restore(deleted.get(index).getContactId());
+            } catch (NumberFormatException | IndexOutOfBoundsException e) {
+                System.out.println("✗ Invalid selection.");
+            }
         }
     }
 }
