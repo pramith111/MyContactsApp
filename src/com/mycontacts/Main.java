@@ -13,7 +13,12 @@ import com.mycontacts.pattern.ContactDeletionLogger;
 import com.mycontacts.pattern.ContactDisplay;
 import com.mycontacts.pattern.ContactMemento;
 import com.mycontacts.pattern.EditContactCommand;
+import com.mycontacts.pattern.EmailSearchSpecification;
 import com.mycontacts.pattern.MaskedEmailContactDisplay;
+import com.mycontacts.pattern.NameSearchSpecification;
+import com.mycontacts.pattern.OrSearchSpecification;
+import com.mycontacts.pattern.PhoneSearchSpecification;
+import com.mycontacts.pattern.SearchSpecification;
 import com.mycontacts.pattern.UpdateEmailCommand;
 import com.mycontacts.pattern.UpdateNameCommand;
 import com.mycontacts.pattern.UpdatePasswordCommand;
@@ -22,6 +27,7 @@ import com.mycontacts.service.ContactService;
 import com.mycontacts.service.EditContactService;
 import com.mycontacts.service.GroupService;
 import com.mycontacts.service.ProfileService;
+import com.mycontacts.service.SearchService;
 import com.mycontacts.service.UserRegistrationService;
 
 import java.util.List;
@@ -36,6 +42,7 @@ public class Main {
     private static EditContactService editContactService = new EditContactService();
     private static ContactDeletionLogger deletionLogger = new ContactDeletionLogger();
     private static GroupService groupService = new GroupService();
+    private static SearchService searchService = new SearchService();
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -56,6 +63,7 @@ public class Main {
                 System.out.println("8. View Deleted Contacts");
                 System.out.println("9. View Deletion Log");
                 System.out.println("10. Manage Groups");
+                System.out.println("11. Search Contacts");
             } else {
                 System.out.println("1. Register");
                 System.out.println("2. Login");
@@ -76,6 +84,7 @@ public class Main {
                     case "8": viewDeletedContacts(); break;
                     case "9": deletionLogger.printLog(); break;
                     case "10": manageGroups(); break;
+                    case "11": searchContacts(); break;
                     case "0": running = false; System.out.println("Goodbye!"); break;
                     default: System.out.println("Invalid choice.");
                 }
@@ -124,17 +133,13 @@ public class Main {
         System.out.println("Current Profile: " + user);
         boolean back = false;
         while (!back) {
-            System.out.println("\n1. Update Name");
-            System.out.println("2. Update Email");
-            System.out.println("3. Update Password");
-            System.out.println("4. Undo Last Change");
-            System.out.println("0. Back");
+            System.out.println("\n1. Update Name  2. Update Email  3. Update Password  4. Undo  0. Back");
             System.out.print("Choose: ");
             String choice = scanner.nextLine();
             switch (choice) {
-                case "1": System.out.print("Enter new name: "); profileService.executeCommand(new UpdateNameCommand(user, scanner.nextLine())); break;
-                case "2": System.out.print("Enter new email: "); profileService.executeCommand(new UpdateEmailCommand(user, scanner.nextLine())); break;
-                case "3": System.out.print("Enter new password: "); profileService.executeCommand(new UpdatePasswordCommand(user, scanner.nextLine())); break;
+                case "1": System.out.print("New name: "); profileService.executeCommand(new UpdateNameCommand(user, scanner.nextLine())); break;
+                case "2": System.out.print("New email: "); profileService.executeCommand(new UpdateEmailCommand(user, scanner.nextLine())); break;
+                case "3": System.out.print("New password: "); profileService.executeCommand(new UpdatePasswordCommand(user, scanner.nextLine())); break;
                 case "4": profileService.undo(); break;
                 case "0": back = true; break;
                 default: System.out.println("Invalid choice.");
@@ -160,13 +165,13 @@ public class Main {
                 System.out.print("Website (optional): "); String website = scanner.nextLine();
                 if (!website.isEmpty()) builder.setWebsite(website);
             }
-            System.out.print("Phone number (optional): "); String phone = scanner.nextLine();
-            if (!phone.isEmpty()) { System.out.print("Phone type (Mobile/Home/Work): "); builder.setPhoneNumber(phone, scanner.nextLine()); }
+            System.out.print("Phone (optional): "); String phone = scanner.nextLine();
+            if (!phone.isEmpty()) { System.out.print("Phone type: "); builder.setPhoneNumber(phone, scanner.nextLine()); }
             System.out.print("Email (optional): "); String email = scanner.nextLine();
-            if (!email.isEmpty()) { System.out.print("Email type (Personal/Work): "); builder.setEmail(email, scanner.nextLine()); }
+            if (!email.isEmpty()) { System.out.print("Email type: "); builder.setEmail(email, scanner.nextLine()); }
             contactService.addContact(builder.build());
         } catch (IllegalArgumentException | IllegalStateException e) {
-            System.out.println("✗ Failed to add contact: " + e.getMessage());
+            System.out.println("✗ Failed: " + e.getMessage());
         }
     }
 
@@ -188,7 +193,7 @@ public class Main {
         try {
             int index = Integer.parseInt(scanner.nextLine());
             Contact contact = contacts.get(index);
-            System.out.println("\nDisplay format: 1.Normal 2.Uppercase 3.Masked Email 4.Both");
+            System.out.println("Format: 1.Normal 2.Uppercase 3.Masked Email 4.Both");
             System.out.print("Choose: ");
             String format = scanner.nextLine();
             ContactDisplay display;
@@ -209,13 +214,13 @@ public class Main {
         List<Contact> contacts = contactService.getAllContacts();
         if (contacts.isEmpty()) { System.out.println("No contacts found."); return; }
         viewAllContacts();
-        System.out.print("Enter contact number to edit: ");
+        System.out.print("Enter contact number: ");
         try {
             int index = Integer.parseInt(scanner.nextLine());
             Contact contact = contacts.get(index);
             boolean back = false;
             while (!back) {
-                System.out.println("\n1. Edit Info  2. Undo  3. Redo  0. Back");
+                System.out.println("\n1. Edit  2. Undo  3. Redo  0. Back");
                 System.out.print("Choose: ");
                 String choice = scanner.nextLine();
                 switch (choice) {
@@ -226,13 +231,13 @@ public class Main {
                             System.out.print("First name (" + p.getFirstName() + "): "); String fn = scanner.nextLine();
                             System.out.print("Last name (" + p.getLastName() + "): "); String ln = scanner.nextLine();
                             System.out.print("Address (" + p.getAddress() + "): "); String addr = scanner.nextLine();
-                            newState = new ContactMemento(fn.isEmpty() ? p.getFirstName() : fn, ln.isEmpty() ? p.getLastName() : ln, null, addr.isEmpty() ? p.getAddress() : addr, null, null, p.getPhoneNumbers(), p.getEmails());
+                            newState = new ContactMemento(fn.isEmpty()?p.getFirstName():fn, ln.isEmpty()?p.getLastName():ln, null, addr.isEmpty()?p.getAddress():addr, null, null, p.getPhoneNumbers(), p.getEmails());
                         } else if (contact instanceof Organization) {
                             Organization o = (Organization) contact;
                             System.out.print("Company (" + o.getCompanyName() + "): "); String cn = scanner.nextLine();
                             System.out.print("Industry (" + o.getIndustry() + "): "); String ind = scanner.nextLine();
                             System.out.print("Website (" + o.getWebsite() + "): "); String web = scanner.nextLine();
-                            newState = new ContactMemento(null, null, cn.isEmpty() ? o.getCompanyName() : cn, null, ind.isEmpty() ? o.getIndustry() : ind, web.isEmpty() ? o.getWebsite() : web, o.getPhoneNumbers(), o.getEmails());
+                            newState = new ContactMemento(null, null, cn.isEmpty()?o.getCompanyName():cn, null, ind.isEmpty()?o.getIndustry():ind, web.isEmpty()?o.getWebsite():web, o.getPhoneNumbers(), o.getEmails());
                         }
                         if (newState != null) editContactService.executeEdit(new EditContactCommand(contact, newState));
                         break;
@@ -252,7 +257,7 @@ public class Main {
         List<Contact> contacts = contactService.getAllContacts();
         if (contacts.isEmpty()) { System.out.println("No contacts found."); return; }
         viewAllContacts();
-        System.out.print("Enter contact number to delete: ");
+        System.out.print("Enter contact number: ");
         try {
             int index = Integer.parseInt(scanner.nextLine());
             Contact contact = contacts.get(index);
@@ -292,63 +297,94 @@ public class Main {
         System.out.println("\n--- Manage Groups ---");
         boolean back = false;
         while (!back) {
-            System.out.println("\n1. Create Group");
-            System.out.println("2. Add Contacts to Group");
-            System.out.println("3. View All Groups");
-            System.out.println("4. Bulk Add All Contacts to Group");
-            System.out.println("0. Back");
+            System.out.println("\n1. Create Group  2. Add Contact to Group  3. View Groups  4. Bulk Add All  0. Back");
             System.out.print("Choose: ");
             String choice = scanner.nextLine();
             switch (choice) {
                 case "1":
-                    System.out.print("Enter group name: ");
+                    System.out.print("Group name: ");
                     groupService.createGroup(scanner.nextLine());
                     break;
                 case "2":
                     List<ContactGroup> groups = groupService.getAllGroups();
-                    if (groups.isEmpty()) { System.out.println("No groups found. Create one first."); break; }
-                    System.out.println("Select group:");
-                    for (int i = 0; i < groups.size(); i++) {
-                        System.out.println("[" + i + "] " + groups.get(i).getName());
-                    }
-                    System.out.print("Enter group number: ");
+                    if (groups.isEmpty()) { System.out.println("No groups. Create one first."); break; }
+                    for (int i = 0; i < groups.size(); i++) System.out.println("[" + i + "] " + groups.get(i).getName());
+                    System.out.print("Select group: ");
                     try {
-                        int gIndex = Integer.parseInt(scanner.nextLine());
-                        ContactGroup group = groups.get(gIndex);
-                        List<Contact> contacts = contactService.getAllContacts();
-                        if (contacts.isEmpty()) { System.out.println("No contacts found."); break; }
+                        int gi = Integer.parseInt(scanner.nextLine());
                         viewAllContacts();
-                        System.out.print("Enter contact number to add: ");
-                        int cIndex = Integer.parseInt(scanner.nextLine());
-                        group.addContact(contacts.get(cIndex));
-                    } catch (NumberFormatException | IndexOutOfBoundsException e) {
-                        System.out.println("✗ Invalid selection.");
-                    }
+                        System.out.print("Select contact: ");
+                        int ci = Integer.parseInt(scanner.nextLine());
+                        groups.get(gi).addContact(contactService.getAllContacts().get(ci));
+                    } catch (NumberFormatException | IndexOutOfBoundsException e) { System.out.println("✗ Invalid."); }
                     break;
-                case "3":
-                    groupService.displayAllGroups();
-                    break;
+                case "3": groupService.displayAllGroups(); break;
                 case "4":
-                    List<ContactGroup> allGroups = groupService.getAllGroups();
-                    if (allGroups.isEmpty()) { System.out.println("No groups found."); break; }
-                    System.out.println("Select group:");
-                    for (int i = 0; i < allGroups.size(); i++) {
-                        System.out.println("[" + i + "] " + allGroups.get(i).getName());
-                    }
-                    System.out.print("Enter group number: ");
+                    List<ContactGroup> ag = groupService.getAllGroups();
+                    if (ag.isEmpty()) { System.out.println("No groups."); break; }
+                    for (int i = 0; i < ag.size(); i++) System.out.println("[" + i + "] " + ag.get(i).getName());
+                    System.out.print("Select group: ");
                     try {
-                        int gIndex = Integer.parseInt(scanner.nextLine());
-                        groupService.bulkAddToGroup(allGroups.get(gIndex), contactService.getAllContacts());
-                    } catch (NumberFormatException | IndexOutOfBoundsException e) {
-                        System.out.println("✗ Invalid selection.");
-                    }
+                        int gi = Integer.parseInt(scanner.nextLine());
+                        groupService.bulkAddToGroup(ag.get(gi), contactService.getAllContacts());
+                    } catch (NumberFormatException | IndexOutOfBoundsException e) { System.out.println("✗ Invalid."); }
                     break;
-                case "0":
-                    back = true;
-                    break;
-                default:
-                    System.out.println("Invalid choice.");
+                case "0": back = true; break;
+                default: System.out.println("Invalid choice.");
             }
         }
+    }
+
+    private static void searchContacts() {
+        System.out.println("\n--- Search Contacts ---");
+        List<Contact> contacts = contactService.getAllContacts();
+        if (contacts.isEmpty()) { System.out.println("No contacts found."); return; }
+
+        System.out.println("Search by:");
+        System.out.println("1. Name");
+        System.out.println("2. Phone");
+        System.out.println("3. Email");
+        System.out.println("4. Name OR Email");
+        System.out.println("5. Name AND Phone");
+        System.out.print("Choose: ");
+        String choice = scanner.nextLine();
+
+        SearchSpecification spec = null;
+        switch (choice) {
+            case "1":
+                System.out.print("Enter name keyword: ");
+                spec = new NameSearchSpecification(scanner.nextLine());
+                break;
+            case "2":
+                System.out.print("Enter phone number: ");
+                spec = new PhoneSearchSpecification(scanner.nextLine());
+                break;
+            case "3":
+                System.out.print("Enter email keyword: ");
+                spec = new EmailSearchSpecification(scanner.nextLine());
+                break;
+            case "4":
+                System.out.print("Enter name keyword: ");
+                String name = scanner.nextLine();
+                System.out.print("Enter email keyword: ");
+                String email = scanner.nextLine();
+                spec = new OrSearchSpecification(
+                        new NameSearchSpecification(name),
+                        new EmailSearchSpecification(email));
+                break;
+            case "5":
+                System.out.print("Enter name keyword: ");
+                String n = scanner.nextLine();
+                System.out.print("Enter phone number: ");
+                String p = scanner.nextLine();
+                spec = new OrSearchSpecification(
+                        new NameSearchSpecification(n),
+                        new PhoneSearchSpecification(p));
+                break;
+            default:
+                System.out.println("Invalid choice.");
+                return;
+        }
+        searchService.displayResults(searchService.search(contacts, spec));
     }
 }
