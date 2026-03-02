@@ -6,6 +6,7 @@ import com.mycontacts.model.Contact;
 import com.mycontacts.model.ContactGroup;
 import com.mycontacts.model.Organization;
 import com.mycontacts.model.Person;
+import com.mycontacts.model.Tag;
 import com.mycontacts.model.User;
 import com.mycontacts.pattern.BasicContactDisplay;
 import com.mycontacts.pattern.ContactBuilder;
@@ -25,6 +26,7 @@ import com.mycontacts.pattern.SearchSpecification;
 import com.mycontacts.pattern.SortByDateAdded;
 import com.mycontacts.pattern.SortByNameAsc;
 import com.mycontacts.pattern.SortByNameDesc;
+import com.mycontacts.pattern.TagFactory;
 import com.mycontacts.pattern.UpdateEmailCommand;
 import com.mycontacts.pattern.UpdateNameCommand;
 import com.mycontacts.pattern.UpdatePasswordCommand;
@@ -35,6 +37,7 @@ import com.mycontacts.service.FilterSortService;
 import com.mycontacts.service.GroupService;
 import com.mycontacts.service.ProfileService;
 import com.mycontacts.service.SearchService;
+import com.mycontacts.service.TagService;
 import com.mycontacts.service.UserRegistrationService;
 
 import java.util.List;
@@ -51,6 +54,7 @@ public class Main {
     private static GroupService groupService = new GroupService();
     private static SearchService searchService = new SearchService();
     private static FilterSortService filterSortService = new FilterSortService();
+    private static TagService tagService = new TagService();
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -73,6 +77,7 @@ public class Main {
                 System.out.println("10. Manage Groups");
                 System.out.println("11. Search Contacts");
                 System.out.println("12. Filter & Sort Contacts");
+                System.out.println("13. Manage Tags");
             } else {
                 System.out.println("1. Register");
                 System.out.println("2. Login");
@@ -95,6 +100,7 @@ public class Main {
                     case "10": manageGroups(); break;
                     case "11": searchContacts(); break;
                     case "12": filterAndSort(); break;
+                    case "13": manageTags(); break;
                     case "0": running = false; System.out.println("Goodbye!"); break;
                     default: System.out.println("Invalid choice.");
                 }
@@ -369,35 +375,84 @@ public class Main {
         System.out.println("\n--- Filter & Sort Contacts ---");
         List<Contact> contacts = contactService.getAllContacts();
         if (contacts.isEmpty()) { System.out.println("No contacts found."); return; }
-
-        System.out.println("Filter by:");
-        System.out.println("1. Person only");
-        System.out.println("2. Organization only");
-        System.out.println("3. No filter (all contacts)");
+        System.out.println("Filter: 1.Person  2.Organization  3.All");
         System.out.print("Choose: ");
         String filterChoice = scanner.nextLine();
-
-        ContactFilter filter = null;
+        ContactFilter filter;
         switch (filterChoice) {
             case "1": filter = new ContactTypeFilter("Person"); break;
             case "2": filter = new ContactTypeFilter("Organization"); break;
             default: filter = c -> contacts.stream().collect(java.util.stream.Collectors.toList());
         }
-
-        System.out.println("\nSort by:");
-        System.out.println("1. Name A-Z");
-        System.out.println("2. Name Z-A");
-        System.out.println("3. Date Added");
+        System.out.println("Sort: 1.Name A-Z  2.Name Z-A  3.Date Added");
         System.out.print("Choose: ");
         String sortChoice = scanner.nextLine();
-
         ContactSortStrategy sort;
         switch (sortChoice) {
             case "2": sort = new SortByNameDesc(); break;
             case "3": sort = new SortByDateAdded(); break;
             default: sort = new SortByNameAsc();
         }
-
         filterSortService.displayResults(filterSortService.filterAndSort(contacts, filter, sort));
+    }
+
+    private static void manageTags() {
+        System.out.println("\n--- Manage Tags ---");
+        boolean back = false;
+        while (!back) {
+            System.out.println("\n1. Create Tag");
+            System.out.println("2. View All Tags");
+            System.out.println("3. Add Tag to Contact");
+            System.out.println("4. View Tags for Contact");
+            System.out.println("0. Back");
+            System.out.print("Choose: ");
+            String choice = scanner.nextLine();
+            switch (choice) {
+                case "1":
+                    System.out.print("Tag name: ");
+                    String tagName = scanner.nextLine();
+                    System.out.print("Tag color (e.g. red, blue): ");
+                    String tagColor = scanner.nextLine();
+                    TagFactory.getTag(tagName, tagColor);
+                    break;
+                case "2":
+                    TagFactory.displayAllTags();
+                    break;
+                case "3":
+                    List<Contact> contacts = contactService.getAllContacts();
+                    if (contacts.isEmpty()) { System.out.println("No contacts found."); break; }
+                    viewAllContacts();
+                    System.out.print("Select contact number: ");
+                    try {
+                        int ci = Integer.parseInt(scanner.nextLine());
+                        Contact contact = contacts.get(ci);
+                        TagFactory.displayAllTags();
+                        System.out.print("Enter tag name to apply: ");
+                        String tn = scanner.nextLine();
+                        Tag tag = TagFactory.getTag(tn);
+                        tagService.addTagToContact(contact, tag);
+                    } catch (NumberFormatException | IndexOutOfBoundsException e) {
+                        System.out.println("✗ Invalid selection.");
+                    }
+                    break;
+                case "4":
+                    List<Contact> allContacts = contactService.getAllContacts();
+                    if (allContacts.isEmpty()) { System.out.println("No contacts found."); break; }
+                    viewAllContacts();
+                    System.out.print("Select contact number: ");
+                    try {
+                        int ci = Integer.parseInt(scanner.nextLine());
+                        tagService.displayTagsForContact(allContacts.get(ci));
+                    } catch (NumberFormatException | IndexOutOfBoundsException e) {
+                        System.out.println("✗ Invalid selection.");
+                    }
+                    break;
+                case "0":
+                    back = true;
+                    break;
+                default:
+                    System.out.println("Invalid choice.");
+            }
+        }
     }
 }
