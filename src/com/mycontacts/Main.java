@@ -11,7 +11,10 @@ import com.mycontacts.pattern.BasicContactDisplay;
 import com.mycontacts.pattern.ContactBuilder;
 import com.mycontacts.pattern.ContactDeletionLogger;
 import com.mycontacts.pattern.ContactDisplay;
+import com.mycontacts.pattern.ContactFilter;
 import com.mycontacts.pattern.ContactMemento;
+import com.mycontacts.pattern.ContactSortStrategy;
+import com.mycontacts.pattern.ContactTypeFilter;
 import com.mycontacts.pattern.EditContactCommand;
 import com.mycontacts.pattern.EmailSearchSpecification;
 import com.mycontacts.pattern.MaskedEmailContactDisplay;
@@ -19,12 +22,16 @@ import com.mycontacts.pattern.NameSearchSpecification;
 import com.mycontacts.pattern.OrSearchSpecification;
 import com.mycontacts.pattern.PhoneSearchSpecification;
 import com.mycontacts.pattern.SearchSpecification;
+import com.mycontacts.pattern.SortByDateAdded;
+import com.mycontacts.pattern.SortByNameAsc;
+import com.mycontacts.pattern.SortByNameDesc;
 import com.mycontacts.pattern.UpdateEmailCommand;
 import com.mycontacts.pattern.UpdateNameCommand;
 import com.mycontacts.pattern.UpdatePasswordCommand;
 import com.mycontacts.pattern.UpperCaseContactDisplay;
 import com.mycontacts.service.ContactService;
 import com.mycontacts.service.EditContactService;
+import com.mycontacts.service.FilterSortService;
 import com.mycontacts.service.GroupService;
 import com.mycontacts.service.ProfileService;
 import com.mycontacts.service.SearchService;
@@ -43,6 +50,7 @@ public class Main {
     private static ContactDeletionLogger deletionLogger = new ContactDeletionLogger();
     private static GroupService groupService = new GroupService();
     private static SearchService searchService = new SearchService();
+    private static FilterSortService filterSortService = new FilterSortService();
     private static Scanner scanner = new Scanner(System.in);
 
     public static void main(String[] args) {
@@ -64,6 +72,7 @@ public class Main {
                 System.out.println("9. View Deletion Log");
                 System.out.println("10. Manage Groups");
                 System.out.println("11. Search Contacts");
+                System.out.println("12. Filter & Sort Contacts");
             } else {
                 System.out.println("1. Register");
                 System.out.println("2. Login");
@@ -85,6 +94,7 @@ public class Main {
                     case "9": deletionLogger.printLog(); break;
                     case "10": manageGroups(); break;
                     case "11": searchContacts(); break;
+                    case "12": filterAndSort(); break;
                     case "0": running = false; System.out.println("Goodbye!"); break;
                     default: System.out.println("Invalid choice.");
                 }
@@ -277,9 +287,7 @@ public class Main {
         System.out.println("\n--- Deleted Contacts ---");
         List<Contact> deleted = contactService.getDeletedContacts();
         if (deleted.isEmpty()) { System.out.println("No deleted contacts."); return; }
-        for (int i = 0; i < deleted.size(); i++) {
-            System.out.println("[" + i + "] " + deleted.get(i).getDisplayName());
-        }
+        for (int i = 0; i < deleted.size(); i++) System.out.println("[" + i + "] " + deleted.get(i).getDisplayName());
         System.out.println("1. Restore  0. Back");
         System.out.print("Choose: ");
         if (scanner.nextLine().equals("1")) {
@@ -287,9 +295,7 @@ public class Main {
             try {
                 int index = Integer.parseInt(scanner.nextLine());
                 contactService.restore(deleted.get(index).getContactId());
-            } catch (NumberFormatException | IndexOutOfBoundsException e) {
-                System.out.println("✗ Invalid selection.");
-            }
+            } catch (NumberFormatException | IndexOutOfBoundsException e) { System.out.println("✗ Invalid."); }
         }
     }
 
@@ -301,13 +307,10 @@ public class Main {
             System.out.print("Choose: ");
             String choice = scanner.nextLine();
             switch (choice) {
-                case "1":
-                    System.out.print("Group name: ");
-                    groupService.createGroup(scanner.nextLine());
-                    break;
+                case "1": System.out.print("Group name: "); groupService.createGroup(scanner.nextLine()); break;
                 case "2":
                     List<ContactGroup> groups = groupService.getAllGroups();
-                    if (groups.isEmpty()) { System.out.println("No groups. Create one first."); break; }
+                    if (groups.isEmpty()) { System.out.println("No groups."); break; }
                     for (int i = 0; i < groups.size(); i++) System.out.println("[" + i + "] " + groups.get(i).getName());
                     System.out.print("Select group: ");
                     try {
@@ -339,52 +342,62 @@ public class Main {
         System.out.println("\n--- Search Contacts ---");
         List<Contact> contacts = contactService.getAllContacts();
         if (contacts.isEmpty()) { System.out.println("No contacts found."); return; }
-
-        System.out.println("Search by:");
-        System.out.println("1. Name");
-        System.out.println("2. Phone");
-        System.out.println("3. Email");
-        System.out.println("4. Name OR Email");
-        System.out.println("5. Name AND Phone");
+        System.out.println("1. By Name  2. By Phone  3. By Email  4. Name OR Email  5. Name AND Phone");
         System.out.print("Choose: ");
         String choice = scanner.nextLine();
-
         SearchSpecification spec = null;
         switch (choice) {
-            case "1":
-                System.out.print("Enter name keyword: ");
-                spec = new NameSearchSpecification(scanner.nextLine());
-                break;
-            case "2":
-                System.out.print("Enter phone number: ");
-                spec = new PhoneSearchSpecification(scanner.nextLine());
-                break;
-            case "3":
-                System.out.print("Enter email keyword: ");
-                spec = new EmailSearchSpecification(scanner.nextLine());
-                break;
+            case "1": System.out.print("Name keyword: "); spec = new NameSearchSpecification(scanner.nextLine()); break;
+            case "2": System.out.print("Phone: "); spec = new PhoneSearchSpecification(scanner.nextLine()); break;
+            case "3": System.out.print("Email keyword: "); spec = new EmailSearchSpecification(scanner.nextLine()); break;
             case "4":
-                System.out.print("Enter name keyword: ");
-                String name = scanner.nextLine();
-                System.out.print("Enter email keyword: ");
-                String email = scanner.nextLine();
-                spec = new OrSearchSpecification(
-                        new NameSearchSpecification(name),
-                        new EmailSearchSpecification(email));
+                System.out.print("Name keyword: "); String n1 = scanner.nextLine();
+                System.out.print("Email keyword: "); String e1 = scanner.nextLine();
+                spec = new OrSearchSpecification(new NameSearchSpecification(n1), new EmailSearchSpecification(e1));
                 break;
             case "5":
-                System.out.print("Enter name keyword: ");
-                String n = scanner.nextLine();
-                System.out.print("Enter phone number: ");
-                String p = scanner.nextLine();
-                spec = new OrSearchSpecification(
-                        new NameSearchSpecification(n),
-                        new PhoneSearchSpecification(p));
+                System.out.print("Name keyword: "); String n2 = scanner.nextLine();
+                System.out.print("Phone: "); String p2 = scanner.nextLine();
+                spec = new OrSearchSpecification(new NameSearchSpecification(n2), new PhoneSearchSpecification(p2));
                 break;
-            default:
-                System.out.println("Invalid choice.");
-                return;
+            default: System.out.println("Invalid choice."); return;
         }
         searchService.displayResults(searchService.search(contacts, spec));
+    }
+
+    private static void filterAndSort() {
+        System.out.println("\n--- Filter & Sort Contacts ---");
+        List<Contact> contacts = contactService.getAllContacts();
+        if (contacts.isEmpty()) { System.out.println("No contacts found."); return; }
+
+        System.out.println("Filter by:");
+        System.out.println("1. Person only");
+        System.out.println("2. Organization only");
+        System.out.println("3. No filter (all contacts)");
+        System.out.print("Choose: ");
+        String filterChoice = scanner.nextLine();
+
+        ContactFilter filter = null;
+        switch (filterChoice) {
+            case "1": filter = new ContactTypeFilter("Person"); break;
+            case "2": filter = new ContactTypeFilter("Organization"); break;
+            default: filter = c -> contacts.stream().collect(java.util.stream.Collectors.toList());
+        }
+
+        System.out.println("\nSort by:");
+        System.out.println("1. Name A-Z");
+        System.out.println("2. Name Z-A");
+        System.out.println("3. Date Added");
+        System.out.print("Choose: ");
+        String sortChoice = scanner.nextLine();
+
+        ContactSortStrategy sort;
+        switch (sortChoice) {
+            case "2": sort = new SortByNameDesc(); break;
+            case "3": sort = new SortByDateAdded(); break;
+            default: sort = new SortByNameAsc();
+        }
+
+        filterSortService.displayResults(filterSortService.filterAndSort(contacts, filter, sort));
     }
 }
